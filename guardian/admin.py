@@ -4,7 +4,9 @@ from django.conf.urls.defaults import patterns, url
 from django.contrib import admin
 from django.contrib import messages
 from django.contrib.admin.widgets import FilteredSelectMultiple
-from django.contrib.auth.models import User, Group
+from django.contrib.auth.models import User, Group, Permission
+from django.contrib.contenttypes.models import ContentType
+
 from django.core.urlresolvers import reverse
 from django.shortcuts import render_to_response, get_object_or_404, redirect
 from django.template import RequestContext
@@ -13,6 +15,7 @@ from django.utils.translation import ugettext, ugettext_lazy as _
 
 from guardian.forms import UserObjectPermissionsForm
 from guardian.forms import GroupObjectPermissionsForm
+from guardian.models import UserObjectPermission
 from guardian.shortcuts import get_perms
 from guardian.shortcuts import get_users_with_perms
 from guardian.shortcuts import get_groups_with_perms
@@ -65,11 +68,6 @@ class GuardedModelAdmin(admin.ModelAdmin):
 
         *Default*: ``False``
 
-        If this would be set to ``True``, ``request.user`` would be used to
-        filter out objects he or she doesn't own (checking ``user`` field
-        of used model - field name may be overridden by
-        ``user_owned_objects_field`` option.
-
         .. note::
            Please remember that this will **NOT** affect superusers!
            Admins would still see all items.
@@ -108,12 +106,25 @@ class GuardedModelAdmin(admin.ModelAdmin):
     user_owned_objects_field = 'user'
 
     def queryset(self, request):
+        """
+        Returns a QuerySet of all model instances that can be edited by the
+        admin site.
+
+        if user_can_access_owned_objects_only == True the list is limited
+        to only those objects user has view_{objectname} permissions set
+        """
         qs = super(GuardedModelAdmin, self).queryset(request)
         if self.user_can_access_owned_objects_only and \
             not request.user.is_superuser:
-            filters = {self.user_owned_objects_field: request.user}
+            content_type = ContentType.objects.get_for_model(self.model)
+            permission = Permission.objects.get(codename="view_"+self.model.__name__.lower())
+            object_pks = UserObjectPermission.objects.filter(
+                content_type=content_type, permission=permission
+                ).values('object_pk')
+            filters = {'pk__in': object_pks}
             qs = qs.filter(**filters)
         return qs
+
 
     def get_urls(self):
         """
@@ -379,4 +390,3 @@ class GroupManage(forms.Form):
         except Group.DoesNotExist:
             raise forms.ValidationError(
                 self.fields['group'].error_messages['does_not_exist'])
-
