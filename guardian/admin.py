@@ -119,7 +119,8 @@ class GuardedModelAdmin(admin.ModelAdmin):
             content_type = ContentType.objects.get_for_model(self.model)
             permission = Permission.objects.get(codename="view_"+self.model.__name__.lower())
             object_pks = UserObjectPermission.objects.filter(
-                content_type=content_type, permission=permission
+                content_type=content_type, permission=permission,
+                user=request.user,
                 ).values('object_pk')
             filters = {'pk__in': object_pks}
             qs = qs.filter(**filters)
