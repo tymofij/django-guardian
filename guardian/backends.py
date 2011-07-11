@@ -4,6 +4,7 @@ from django.db import models
 from guardian.conf import settings
 from guardian.exceptions import WrongAppError
 from guardian.core import ObjectPermissionChecker
+from guardian.models import UserObjectPermission
 
 class ObjectPermissionBackend(object):
     supports_object_permissions = True
@@ -58,3 +59,10 @@ class ObjectPermissionBackend(object):
         check = ObjectPermissionChecker(user_obj)
         return check.has_perm(perm, obj)
 
+    def has_module_perms(self, user_obj, app_label):
+        """
+        Returns ``True`` if user_obj has any permissions on the given app_label
+        """
+        return UserObjectPermission.objects.filter(
+            content_type__app_label=app_label,
+            user=user_obj).exists()

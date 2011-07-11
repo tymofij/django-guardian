@@ -117,7 +117,7 @@ class GuardedModelAdmin(admin.ModelAdmin):
         if self.user_can_access_owned_objects_only and \
             not request.user.is_superuser:
             content_type = ContentType.objects.get_for_model(self.model)
-            permission = Permission.objects.get(codename="view_"+self.model.__name__.lower())
+            permission = Permission.objects.get(codename="change_"+self.model.__name__.lower())
             object_pks = UserObjectPermission.objects.filter(
                 content_type=content_type, permission=permission,
                 user=request.user,
@@ -126,6 +126,17 @@ class GuardedModelAdmin(admin.ModelAdmin):
             qs = qs.filter(**filters)
         return qs
 
+    # we need to override specifically this in order to see the model in app
+    # (model list) and have a link to it, when we have only object-level perms.
+    def has_change_permission(self, request, obj=None):
+        super_has = super(GuardedModelAdmin, self).has_change_permission(request)
+        content_type = ContentType.objects.get_for_model(self.model)
+        permission = Permission.objects.get(codename="change_" + self.model.__name__.lower())
+        has = UserObjectPermission.objects.filter(
+            permission=permission,
+            content_type=content_type,
+            user=request.user).exists()
+        return super_has or has
 
     def get_urls(self):
         """
